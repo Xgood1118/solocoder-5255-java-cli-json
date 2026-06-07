@@ -1,0 +1,9 @@
+jj 跑起来是能跑的，`.users[0].name` 这种基础查询、`length`、`keys`、`select`、`map`、JSONPath `$.users[*].name`、Schema 校验、JSONL 流式、CSV 输出都 OK。但有 3 个 PROMPT 写明要做的东西没工作。
+
+一个是 jq 过滤语法 `.users[?(@.age > 18)].name`——这是 PROMPT 第 6 行第一个例子，直接拿去跑报错 `期望 ']' 却得到 LPAREN 在位置 8`，看 JqEvaluator.java 里完全没解析 `[?(...)]` 这种谓词，等于核心过滤功能没做。
+
+另一个是多文件 `*.name a.json b.json`——PROMPT 第 12 行明说要支持的，实际跑就报 `意外 token STAR 在位置 0`。多文件加载本身能跑（用 `.[] | .name` 走 `*` 的 fallback 路径可以查到），就是 `*` 这个符号没接到解析器里。
+
+还有 JSON 浮点精度——PROMPT 第 29 行写要用 BigDecimal 避免精度丢失，但我塞了个 `0.123456789012345678901234567890` 进去，出来是 `0.12345678901234568`，明显被 double 截断了。看 Main.java 的 ObjectMapper 没开 USE_BIG_DECIMAL_FOR_FLOATS。
+
+检查修复一下。

@@ -1,0 +1,29 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Alice",
+      "age": 25,
+      "email": "alice@example.com",
+      "active": true
+    },
+    {
+      "id": 2,
+      "name": "Bob",
+      "age": 17,
+      "email": "bob@example.com",
+      "active": false
+    },
+    {
+      "id": 3,
+      "name": "Charlie",
+      "age": 30,
+      "email": "charlie@example.com",
+      "active": true
+    }
+  ],
+  "metadata": {
+    "total": 3,
+    "page": 1
+  }
+}

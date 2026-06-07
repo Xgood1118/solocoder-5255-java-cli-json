@@ -1,0 +1,30 @@
+需求：高性能 JSON 命令行处理工具，支持查询、转换、jq 语法兼容、Schema 校验、大文件流式处理。
+
+背景：日常运维和数据分析经常需要处理 JSON——查一个字段、提取部分子树、JSON 转 CSV 给 Excel、校验接口返回结构。`jq` 强但语法陡峭，Python `json.tool` 又太弱。我们想用 Java 写一个：单 jar 启动快（GraalVM native 可选）、查询语法和 jq 100% 兼容、JSON Path 也支持、大文件流式不爆内存。
+
+核心功能：
+- jq 兼容：`jj '.users[?(@.age > 18)].name'` 语法完全兼容（用 `com.fasterxml.jackson` + 自写解析器或基于 `jq-jackson` 库）
+- JSONPath：`jj '$.users[*].name'` 兼容 `$..name` 等语法
+- Schema 校验：`jj --schema schema.json data.json` 用 JSON Schema 2020-12 校验，错误带 JSON Pointer 路径
+- 转换输出：`jj --format csv data.json` 把扁平 JSON 转 CSV，嵌套数组报错
+- 大文件流式：`jj --stream huge.jsonl` 按行处理 JSONL（每行一个 JSON），不会一次性读全
+- 格式化：默认美化（2 空格缩进），`--compact` 单行输出
+- 多输入：`jj '*.name' a.json b.json` 把多个文件数组化后查询
+
+涉及模块：
+- `Main.java`：CLI 入口，picocli 解析参数
+- `JqEvaluator.java`：jq 表达式解析器、AST、求值
+- `PathEngine.java`：JSONPath 求值（用 Jayway JsonPath）
+- `SchemaValidator.java`：JSON Schema 2020-12 校验（networknt/json-schema-validator）
+- `StreamReader.java`：Jackson Streaming API 增量解析，避免大文件 OOM
+- `CsvExporter.java`：扁平化 JSON → CSV 输出
+
+注意事项：
+- jq 兼容要做到 `length`、`keys`、`select`、`map` 常用函数都覆盖，不要只支持 `.field` 这种基础
+- 大文件（GB 级）必须用 Jackson `JsonParser` 流式 API，别用 `ObjectMapper.readTree()` 一次性加载
+- JSONL 按 `\n` 分割时注意末尾可能多一个空行，要 trim 后再解析
+- Schema 校验错误信息要带 schema path（`#/properties/users/items/required`）和数据 path（`/users/2`），方便定位
+- picocli 的 `versionProvider` 用 `META-INF/MANIFEST.MF` 里的 Implementation-Version，打包时 mvn-shade 自动注入
+- GraalVM native image 反射注册麻烦，Jackson 涉及大量反射，要么用 `-H:ReflectionConfigurationFiles` 要么改成 no-arg constructor 模式
+- 浮点精度：JSON 里的 `1.0e308` 用 BigDecimal 解析而不是 double，避免丢精度
+- 错误信息要友好，定位到具体行号（流式读取时记录行号）
