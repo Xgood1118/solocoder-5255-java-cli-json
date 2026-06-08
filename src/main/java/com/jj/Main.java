@@ -1,5 +1,6 @@
 package com.jj;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -49,7 +50,8 @@ public class Main implements Callable<Integer> {
     @Option(names = {"--indent"}, description = "缩进空格数 (默认 2)")
     private int indent = 2;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new ObjectMapper()
+            .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
     private final JqEvaluator jqEvaluator = new JqEvaluator();
     private final PathEngine pathEngine = new PathEngine();
     private final SchemaValidator schemaValidator = new SchemaValidator();

@@ -1,5 +1,6 @@
 package com.jj;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.Configuration;
@@ -11,7 +12,8 @@ import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 public class PathEngine {
 
     private final Configuration config;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new ObjectMapper()
+            .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
 
     public PathEngine() {
         this.config = Configuration.builder()

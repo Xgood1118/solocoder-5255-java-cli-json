@@ -3,6 +3,7 @@ package com.jj;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -16,7 +17,8 @@ public class StreamReader {
     private final JsonFactory jsonFactory;
 
     public StreamReader() {
-        this.mapper = new ObjectMapper();
+        this.mapper = new ObjectMapper()
+                .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
         this.jsonFactory = new JsonFactory();
     }
 

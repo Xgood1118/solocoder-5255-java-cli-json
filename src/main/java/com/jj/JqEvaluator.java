@@ -3,11 +3,28 @@ package com.jj;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.*;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 public class JqEvaluator {
 
     private final JsonNodeFactory nodeFactory = JsonNodeFactory.instance;
+
+    private BigDecimal toBigDecimal(JsonNode node) {
+        if (node.isBigDecimal()) return node.decimalValue();
+        if (node.isBigInteger()) return new BigDecimal(node.bigIntegerValue());
+        return new BigDecimal(node.asText());
+    }
+
+    private JsonNode numberResult(BigDecimal bd) {
+        try {
+            if (bd.scale() == 0 || bd.stripTrailingZeros().scale() <= 0) {
+                return LongNode.valueOf(bd.longValueExact());
+            }
+        } catch (ArithmeticException ignored) {
+        }
+        return DecimalNode.valueOf(bd);
+    }
 
     public JsonNode evaluate(JsonNode root, String expression) {
         if (expression == null || expression.isEmpty() || ".".equals(expression)) {
@@ -320,9 +337,17 @@ public class JqEvaluator {
             try {
                 String text = context.textValue().trim();
                 if (text.contains(".") || text.contains("e") || text.contains("E")) {
-                    return DoubleNode.valueOf(Double.parseDouble(text));
+                    return DecimalNode.valueOf(new BigDecimal(text));
                 }
-                return IntNode.valueOf(Integer.parseInt(text));
+                try {
+                    long l = Long.parseLong(text);
+                    if (l >= Integer.MIN_VALUE && l <= Integer.MAX_VALUE) {
+                        return IntNode.valueOf((int) l);
+                    }
+                    return LongNode.valueOf(l);
+                } catch (NumberFormatException e) {
+                    return DecimalNode.valueOf(new BigDecimal(text));
+                }
             } catch (NumberFormatException e) {
                 throw new RuntimeException("无法转换为数字: " + context.textValue());
             }
@@ -711,7 +736,10 @@ public class JqEvaluator {
             if (left.isInt() && right.isInt()) {
                 return IntNode.valueOf(left.intValue() + right.intValue());
             }
-            return DoubleNode.valueOf(left.doubleValue() + right.doubleValue());
+            if (left.isLong() && right.isLong()) {
+                return LongNode.valueOf(left.longValue() + right.longValue());
+            }
+            return numberResult(toBigDecimal(left).add(toBigDecimal(right)));
         }
         if (left.isTextual() && right.isTextual()) {
             return TextNode.valueOf(left.textValue() + right.textValue());
@@ -736,7 +764,10 @@ public class JqEvaluator {
             if (left.isInt() && right.isInt()) {
                 return IntNode.valueOf(left.intValue() - right.intValue());
             }
-            return DoubleNode.valueOf(left.doubleValue() - right.doubleValue());
+            if (left.isLong() && right.isLong()) {
+                return LongNode.valueOf(left.longValue() - right.longValue());
+            }
+            return numberResult(toBigDecimal(left).subtract(toBigDecimal(right)));
         }
         if (left.isArray() && right.isArray()) {
             Set<String> remove = new HashSet<>();
@@ -755,7 +786,10 @@ public class JqEvaluator {
             if (left.isInt() && right.isInt()) {
                 return IntNode.valueOf(left.intValue() * right.intValue());
             }
-            return DoubleNode.valueOf(left.doubleValue() * right.doubleValue());
+            if (left.isLong() && right.isLong()) {
+                return LongNode.valueOf(left.longValue() * right.longValue());
+            }
+            return numberResult(toBigDecimal(left).multiply(toBigDecimal(right)));
         }
         if (left.isTextual() && right.isInt()) {
             StringBuilder sb = new StringBuilder();
@@ -774,15 +808,16 @@ public class JqEvaluator {
 
     private JsonNode divideNodes(JsonNode left, JsonNode right) {
         if (left.isNumber() && right.isNumber()) {
-            double d = left.doubleValue() / right.doubleValue();
-            return DoubleNode.valueOf(d);
+            BigDecimal d = toBigDecimal(left).divide(toBigDecimal(right), 34, java.math.RoundingMode.HALF_UP);
+            return numberResult(d);
         }
         throw new RuntimeException("不能相除");
     }
 
     private JsonNode modNodes(JsonNode left, JsonNode right) {
         if (left.isNumber() && right.isNumber()) {
-            return DoubleNode.valueOf(left.doubleValue() % right.doubleValue());
+            BigDecimal d = toBigDecimal(left).remainder(toBigDecimal(right));
+            return numberResult(d);
         }
         throw new RuntimeException("不能取模");
     }
@@ -799,7 +834,7 @@ public class JqEvaluator {
             return Boolean.compare(a.booleanValue(), b.booleanValue());
         }
         if (a.isNumber() && b.isNumber()) {
-            return Double.compare(a.doubleValue(), b.doubleValue());
+            return toBigDecimal(a).compareTo(toBigDecimal(b));
         }
         if (a.isTextual() && b.isTextual()) {
             return a.textValue().compareTo(b.textValue());
@@ -821,7 +856,7 @@ public class JqEvaluator {
     private boolean isTruthy(JsonNode node) {
         if (node == null || node.isNull()) return false;
         if (node.isBoolean()) return node.booleanValue();
-        if (node.isNumber()) return node.doubleValue() != 0;
+        if (node.isNumber()) return !toBigDecimal(node).equals(BigDecimal.ZERO);
         if (node.isTextual()) return !node.textValue().isEmpty();
         if (node.isArray()) return true;
         if (node.isObject()) return true;
@@ -1508,7 +1543,7 @@ public class JqEvaluator {
         String s = num.value;
         try {
             if (s.contains(".") || s.contains("e") || s.contains("E")) {
-                return ExprNode.literal(DoubleNode.valueOf(Double.parseDouble(s)));
+                return ExprNode.literal(DecimalNode.valueOf(new BigDecimal(s)));
             }
             long l = Long.parseLong(s);
             if (l >= Integer.MIN_VALUE && l <= Integer.MAX_VALUE) {
@@ -1516,7 +1551,7 @@ public class JqEvaluator {
             }
             return ExprNode.literal(LongNode.valueOf(l));
         } catch (NumberFormatException e) {
-            return ExprNode.literal(DoubleNode.valueOf(Double.parseDouble(s)));
+            return ExprNode.literal(DecimalNode.valueOf(new BigDecimal(s)));
         }
     }
 
